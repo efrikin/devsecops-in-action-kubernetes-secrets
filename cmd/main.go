@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,7 +9,7 @@ import (
 )
 
 const (
-	envVar = "DEMO_SECRET__PASSWD"
+	envVar = "DEMO_SECRET__PASSWD_FILE"
 )
 
 type middleware struct {
@@ -20,13 +21,26 @@ func (l *middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.logger.ServeHTTP(w, r)
 }
 
+func fileExist(path string) bool {
+	info, err := os.Stat(path)
+	if err == nil {
+		return !info.IsDir()
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return false
+}
+
 func httpHandle(w http.ResponseWriter, r *http.Request) {
 
 	var isExist, ok bool
 	var envVal string
 
 	if envVal, ok = os.LookupEnv(envVar); ok {
-		isExist = true
+		if fileExist(envVal) {
+			isExist = true
+		}
 	}
 
 	switch r.URL.Path {
@@ -44,7 +58,7 @@ func httpHandle(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "OK")
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintln(w, "Environment variable wasn't defined")
+			fmt.Fprintln(w, "File or environment variable wasn't found")
 		}
 	default:
 		w.WriteHeader(http.StatusNotFound)
