@@ -15,19 +15,12 @@ secretGenerator:
 images:
   - name: IMAGE
     newName: demo-secret
-    newTag: stage-01
+    newTag: stage-03
 
 patches:
 - target:
     kind: Pod
   patch: |-
-
-    - op: add
-      path: "/spec/containers/0/lifecycle"
-      value:
-        postStart:
-          exec:
-            command: ["sh", "-c", "wget -qO- localhost:8080/readiness && echo > ${DEMO_SECRET__PASSWD_FILE}"]
 
     - op: add
       path: "/spec/containers/0/envFrom"
@@ -52,7 +45,7 @@ patches:
       value:
         - name: secret-injector
           image: alpine:3.19
-          command: ["sh", "-c", "cat /dev/urandom |base64 -w 0|fold -w 16| head -1 > ${DEMO_SECRET__PASSWD_FILE}"]
+          command: ["sh", "-c", "test ${DEMO_SECRET__PASSWD##file://*} || cat /dev/urandom | base64 -w 0 | fold -w 16 | head -1 > ${DEMO_SECRET__PASSWD#file://}"]
           volumeMounts:
             - name: demo-secret
               mountPath: /secrets
@@ -60,3 +53,9 @@ patches:
            - secretRef:
                name: demo-secret
 
+    - op: add
+      path: "/spec/containers/0/lifecycle"
+      value:
+        postStart:
+          exec:
+            command: ["sh", "-c", "(test -f ${DEMO_SECRET__PASSWD##file://} && wget -qO- localhost:8080/readiness && echo > ${DEMO_SECRET__PASSWD##file://}) || exit 0"]
